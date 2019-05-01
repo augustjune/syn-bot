@@ -8,12 +8,13 @@ import com.bot4s.telegram.future.{Polling, TelegramBot}
 import com.softwaremill.sttp.okhttp.OkHttpFutureBackend
 import slogging.{LogLevel, LoggerConfig, PrintLoggerFactory}
 import cats.instances.future._
+import com.bot4s.telegram.methods.ParseMode
 
 import scala.concurrent.Future
 
-class Bot(token: String) extends TelegramBot with Polling with Commands[Future] {
+class SynBot(token: String) extends TelegramBot with Polling with Commands[Future] {
   LoggerConfig.factory = PrintLoggerFactory()
-  LoggerConfig.level = LogLevel.INFO
+  LoggerConfig.level = LogLevel.TRACE
 
   implicit val backend = OkHttpFutureBackend()
   override val client: RequestHandler[Future] = new FutureSttpClient(token)
@@ -37,10 +38,10 @@ class Bot(token: String) extends TelegramBot with Polling with Commands[Future] 
           case Right(word) =>
             val response = word.meanings.map {
               case WordMeaning(context, synonyms, _) =>
-                s"As '$context': ${synonyms.take(5).mkString("", ", ", ".")}"
-            }.mkString(s"Synonyms for word '${word.term}':\n", "\n", "")
+                s"As '_${context}_': ${synonyms.take(5).mkString("\n- ", "\n- ", "\n")}"
+            }.mkString(s"Synonyms for word '*${word.term}*':\n", "\n", "")
 
-            reply(response)(msg).map(_ => ())
+            reply(response, Some(ParseMode.Markdown))(msg).map(_ => ())
         }
     }
   }
