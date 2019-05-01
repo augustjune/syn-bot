@@ -21,7 +21,7 @@ class SynBot(token: String) extends TelegramBot with Polling with Commands[Futur
   val thesaurus = new Thesaurus[Future]
 
   onCommand("/syn") { msg =>
-    msg.text.flatMap(validateMessage).map(thesaurus.lookup) match {
+    msg.text.flatMap(extractArgument).map(thesaurus.lookup) match {
       case None => Future.unit
       case Some(futureSyn) =>
         futureSyn.flatMap {
@@ -39,14 +39,65 @@ class SynBot(token: String) extends TelegramBot with Polling with Commands[Futur
             val response = word.meanings.map {
               case WordMeaning(context, synonyms, _) =>
                 s"As '_${context}_': ${synonyms.take(5).mkString("\n- ", "\n- ", "\n")}"
-            }.mkString(s"Synonyms for word '*${word.term}*':\n", "\n", "")
+            }.mkString(s"Synonyms of word '*${word.term}*':\n", "\n", "")
 
             reply(response, Some(ParseMode.Markdown))(msg).map(_ => ())
         }
     }
   }
 
-  private def validateMessage(text: String): Option[String] = {
+  onCommand("/ant") { msg =>
+    msg.text.flatMap(extractArgument).map(thesaurus.lookup) match {
+      case None => Future.unit
+      case Some(futureSyn) =>
+        futureSyn.flatMap {
+          case Left(lookupError) =>
+            val response = "Error occurred while handling your request:\n" + (lookupError match {
+              case NoWordProvided => "No word was provided"
+              case Misspelling(misspelledTerm) => s"Did you mean: $misspelledTerm"
+              case JsonParsingError(message) => s"We could not parse the response from server.\n\t$message"
+              case ServerError(message) => s"We could not connect to server.\n\t$message"
+            })
+
+            reply(response)(msg).map(_ => ())
+
+          case Right(word) =>
+            val response = word.meanings.map {
+              case WordMeaning(context, _, antonyms) =>
+                s"As '_${context}_': ${antonyms.take(5).mkString("\n- ", "\n- ", "\n")}"
+            }.mkString(s"Antonyms of word '*${word.term}*':\n", "\n", "")
+
+            reply(response, Some(ParseMode.Markdown))(msg).map(_ => ())
+        }
+    }
+  }
+
+  onCommand("/examples") { msg =>
+    msg.text.flatMap(extractArgument).map(thesaurus.lookup) match {
+      case None => Future.unit
+      case Some(futureSyn) =>
+        futureSyn.flatMap {
+          case Left(lookupError) =>
+            val response = "Error occurred while handling your request:\n" + (lookupError match {
+              case NoWordProvided => "No word was provided"
+              case Misspelling(misspelledTerm) => s"Did you mean: $misspelledTerm"
+              case JsonParsingError(message) => s"We could not parse the response from server.\n\t$message"
+              case ServerError(message) => s"We could not connect to server.\n\t$message"
+            })
+
+            reply(response)(msg).map(_ => ())
+
+          case Right(word) =>
+            val response = word.usageExamples.take(5).map { sentence =>
+                s"_${sentence}_"
+            }.mkString(s"Usage of word '*${word.term}*':\n- ", "\n- ", "")
+
+            reply(response, Some(ParseMode.Markdown))(msg).map(_ => ())
+        }
+    }
+  }
+
+  private def extractArgument(text: String): Option[String] = {
     if (text.indexOf(" ") == -1) None
     else Some(text.substring(text.indexOf(" ") + 1))
   }
